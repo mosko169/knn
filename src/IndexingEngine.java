@@ -1,7 +1,4 @@
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,13 +7,9 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
-import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexOptions;
-import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.misc.HighFreqTerms;
-import org.apache.lucene.misc.TermStats;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.RAMDirectory;
 
@@ -74,8 +67,8 @@ public class IndexingEngine {
 	private void indexDocuments(List<String[]> documents) throws IOException {
 		IndexWriter indexWriter = new IndexWriter(this._index, new IndexWriterConfig(new StandardAnalyzer()));
 		for (String[] document : documents) {
-			String documentContent = normalizeString(document[3]);
-			String documentTitle = normalizeString(document[2]);
+			String documentContent = normalizeString(document[Config.CONTENT_FIELD]);
+			String documentTitle = normalizeString(document[Config.TITLE_FIELD]);
 			Document d = new Document();
 			FieldType f = new FieldType();
 			f.setStoreTermVectors(true);

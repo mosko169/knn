@@ -49,5 +49,9 @@ public class Config {
     private static final String TEST_FILE_FIELD = "testFile";
     private static final String OUT_FILE_FIELD = "outputFile";
     private static final String K_FIELD = "k";
+    public static final Integer DOC_ID_FIELD = 0;
+    public static final Integer LABEL_FIELD = 1;
+    public static final Integer TITLE_FIELD = 2;
+    public static final Integer CONTENT_FIELD = 3;
 
 }

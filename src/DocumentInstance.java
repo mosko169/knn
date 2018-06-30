@@ -1,5 +1,8 @@
 import java.util.List;
 
+/**
+ * represents a single document, its tf-idf vector and its true label
+ */
 public class DocumentInstance {
 	public DocumentInstance(int docId, String label, List<Double> tfidfVector) {
 		this.docId = docId;
