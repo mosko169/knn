@@ -64,11 +64,11 @@ public class Main {
     	// calculate tfidf vector for each docuemnt
     	for (int docId = 0; docId < ir.numDocs(); ++docId) {
     		List<Double> tfidf = new ArrayList<Double>();
-    		List<String> docTerms = termsInDocument(ir, docId);
+    		Map<String, Integer> docTerms = termsInDocument(ir, docId);
     		// calculate tf(term, doc) for term in index and current document
     		for (String term: termsInIndex) {
-    			int termFreq = Collections.frequency(docTerms, term);
-    			Double tf =  (termFreq == 0) ? 0.0 : (1 + Math.log10(termFreq));
+    			Integer termFreq = docTerms.get(term);
+    			Double tf =  (termFreq == 0 || termFreq == null) ? 0.0 : (1 + Math.log10(termFreq));
     			tfidf.add(tf * idfs.get(term));
     		}
     		tfidfs.add(tfidf);
@@ -83,13 +83,13 @@ public class Main {
      * @return
      * @throws Exception
      */
-    public static List<String> termsInDocument(IndexReader ir, int docId) throws Exception {
+    public static Map<String, Integer> termsInDocument(IndexReader ir, int docId) throws Exception {
 		Terms docTerms = ir.getTermVector(docId, LuceneConstants.CONTENTS);
 		TermsEnum termsEnum = docTerms.iterator();
 		BytesRef t = termsEnum.next();
-		List<String> terms = new ArrayList<String>();
+    	Map<String, Integer> terms = new HashMap<String, Integer>();
 		while (t != null) {
-			terms.add(t.utf8ToString());
+			terms.put(t.utf8ToString(), (int) termsEnum.totalTermFreq());
 			t = termsEnum.next();
 		}
 		return terms;
@@ -104,7 +104,7 @@ public class Main {
     public static Set<String> getAllTerms(IndexReader ir) throws Exception {
     	Set<String> terms = new HashSet<String>();
     	for (int docId = 0; docId < ir.numDocs(); ++docId) {
-    		terms.addAll(termsInDocument(ir, docId));
+    		terms.addAll(termsInDocument(ir, docId).keySet());
     	}
     	return terms;
     }
