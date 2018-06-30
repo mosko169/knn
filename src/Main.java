@@ -15,10 +15,15 @@ public class Main {
             ie.addToIndex(trainDocs);
             
             IndexReader indexReader = DirectoryReader.open(ie.getIndex());
-            List<DocumentInstance> tfidfs = TFIDFProcessor.getTFIDFVectors(indexReader, trainDocs);
-            
+            TFIDFProcessor tf_idfProcessor = new TFIDFProcessor(indexReader);
+            List<DocumentInstance> tfidfs = tf_idfProcessor.getTFIDFVectors(trainDocs);
+            KNNClassifier classifier = new KNNClassifier(tfidfs);
             List<String[]> testDocuments = CsvParser.parse(config.testFile);
-        	// TODO - compute k nearest neighbors for each test document and all tfidf
+            for (String[] testDocument: testDocuments) {
+                DocumentInstance testDoc = tf_idfProcessor.getTFIDFVectorForTestDoc(testDocument, ie);
+                classifier.classify(testDoc);
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }

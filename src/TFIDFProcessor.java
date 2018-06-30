@@ -1,17 +1,40 @@
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.StringTokenizer;
 
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.util.BytesRef;
 
+
 public class TFIDFProcessor {
+	public TFIDFProcessor(IndexReader ir) throws Exception {
+		_ir = ir;
+		calcIDFS();
+	}
+	
+	private void calcIDFS() throws Exception {
+		Set<String> termsInIndex = getAllTerms(_ir);
+    	int numDocs = _ir.numDocs();
+    	
+    	// calculate idf for each term
+    	_idfs = new HashMap<String, Double>();
+    	for (String term: termsInIndex) {
+    		int termDocFreq = _ir.docFreq(new Term(LuceneConstants.CONTENTS, term));
+    		_idfs.put(term, Math.log10(((double)numDocs) / (double)termDocFreq));
+    	}
+	}
 	
 	/**
 	 * returns a list of training set documents and their tf-idf vectors
@@ -19,8 +42,8 @@ public class TFIDFProcessor {
 	 * @param trainingSet - training set documents
 	 * @throws Exception
 	 */
-	public static List<DocumentInstance> getTFIDFVectors(IndexReader ir, List<String[]> trainingSet) throws Exception {
-        List<List<Double>> tfidfs = getDocumentTfIDFVectors(ir);
+	public List<DocumentInstance> getTFIDFVectors(List<String[]> trainingSet) throws Exception {
+        List<List<Double>> tfidfs = getDocumentTfIDFVectors();
         List<DocumentInstance> processedTrainDocuments = new ArrayList<DocumentInstance>();
         int documentIndex = 0;
         for (String[] trainDoc: trainingSet) {
@@ -33,37 +56,59 @@ public class TFIDFProcessor {
         return processedTrainDocuments;
 	}
 	
+	public DocumentInstance getTFIDFVectorForTestDoc(String[] testDoc, IndexingEngine index) throws Exception {
+		// normalize test document content in the same technique used for training documents
+		String testDocContent = index.normalizeString(testDoc[Config.CONTENT_FIELD]);
+		QueryParser q = new QueryParser(LuceneConstants.CONTENTS, new StandardAnalyzer());
+		String normalizedContent = q.parse(QueryParser.escape(testDocContent)).toString(LuceneConstants.CONTENTS);
+	    StringTokenizer st = new StringTokenizer(normalizedContent);
+		ArrayList<String> testDocTerms = new ArrayList<String>();        
+        while (st.hasMoreTokens()){
+        	testDocTerms.add(st.nextToken());
+        }
+        
+        // after normalizing test doc, compute its tf-idf vector against the training set index
+        List<Double> testDocTFIDF = new ArrayList<Double>();
+	    Iterator<Entry<String, Double>> idfsIter = _idfs.entrySet().iterator();
+	    while (idfsIter.hasNext()) {
+	        Map.Entry<String, Double> pair = idfsIter.next();
+	        Double termTf = tf(Collections.frequency(testDocTerms, pair.getKey()));
+	        testDocTFIDF.add(termTf * pair.getValue());
+        }
+	    
+	    return new DocumentInstance(Integer.parseInt(testDoc[Config.DOC_ID_FIELD]), testDoc[Config.LABEL_FIELD], testDocTFIDF);
+	}
+	
     /**
      * calculate tf-idf vectors for each document in the index
      * @param ir - index reader to read frequencies from
      * @return a list of tf-idf vectors
      * @throws Exception
      */
-    public static List<List<Double>> getDocumentTfIDFVectors(IndexReader ir) throws Exception {
+    public List<List<Double>> getDocumentTfIDFVectors() throws Exception {
     	List<List<Double>> tfidfs = new ArrayList<List<Double>>();
-    	Set<String> termsInIndex = getAllTerms(ir);
-    	int numDocs = ir.numDocs();
-    	
-    	// calculate idf for each term
-    	Map<String, Double> idfs = new HashMap<String, Double>();
-    	for (String term: termsInIndex) {
-    		int termDocFreq = ir.docFreq(new Term(LuceneConstants.CONTENTS, term));
-    		idfs.put(term, Math.log10(((double)numDocs) / (double)termDocFreq));
-    	}
+
     	
     	// calculate tf-idf vector for each document
-    	for (int docId = 0; docId < ir.numDocs(); ++docId) {
+    	for (int docId = 0; docId < _ir.numDocs(); ++docId) {
     		List<Double> tfidf = new ArrayList<Double>();
-    		Map<String, Integer> docTerms = termsInDocument(ir, docId);
+    		Map<String, Integer> docTerms = termsInDocument(_ir, docId);
     		// calculate tf(term, doc) for term in index and current document
-    		for (String term: termsInIndex) {
-    			Integer termFreq = docTerms.get(term);
-    			Double tf =  (termFreq == null || termFreq == 0) ? 0.0 : (1 + Math.log10(termFreq));
-    			tfidf.add(tf * idfs.get(term));
+    		
+    	    Iterator<Entry<String, Double>> idfsIter = _idfs.entrySet().iterator();
+    	    while (idfsIter.hasNext()) {
+    	        Map.Entry<String, Double> pair = idfsIter.next();
+    			Integer termFreq = docTerms.get(pair.getKey());
+    			Double termTf = tf(termFreq);
+    			tfidf.add(termTf * pair.getValue());
     		}
     		tfidfs.add(tfidf);
     	}
 		return tfidfs;
+    }
+    
+    public static Double tf(Integer termFreq) {
+    	return (termFreq == null || termFreq == 0) ? 0.0 : (1 + Math.log10(termFreq));
     }
     
     /**
@@ -72,7 +117,7 @@ public class TFIDFProcessor {
      * @param docId - id document to process
      * @throws Exception
      */
-    public static Map<String, Integer> termsInDocument(IndexReader ir, int docId) throws Exception {
+    private static Map<String, Integer> termsInDocument(IndexReader ir, int docId) throws Exception {
 		Terms docTerms = ir.getTermVector(docId, LuceneConstants.CONTENTS);
 		TermsEnum termsEnum = docTerms.iterator();
 		BytesRef t = termsEnum.next();
@@ -96,4 +141,7 @@ public class TFIDFProcessor {
     	}
     	return terms;
     }
+    
+    private IndexReader _ir;
+    private Map<String, Double> _idfs;
 }

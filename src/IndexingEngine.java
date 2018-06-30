@@ -10,6 +10,7 @@ import org.apache.lucene.document.FieldType;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.RAMDirectory;
 
@@ -53,6 +54,7 @@ public class IndexingEngine {
 	 */
 	public String normalizeString(String input) throws IOException {
 		input = input.toLowerCase();
+		input = QueryParser.escape(input);
 		for (Map.Entry<String, String> e : this._normalizingStrings.entrySet()) {
 			input = input.replaceAll(e.getKey(), e.getValue());
 		}
